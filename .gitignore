@@ -1,0 +1,9 @@
+# Ignorar archivo de claves (MUY IMPORTANTE)
+.env
+
+# Ignorar carpeta de librerías de Python
+venv/
+__pycache__/
+
+# Ignorar archivos de sistema
+.DS_Store
