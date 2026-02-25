@@ -2,10 +2,7 @@ from supabase import create_client, Client
 import config
 import utils
 
-# Inicializar cliente de Supabase
 supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
-
-# 🛡️ SEGURIDAD: LISTA BLANCA DE COLUMNAS
 COLUMNAS_PERMITIDAS = "id,clave,nombre,municipio,colonia,precio,subtipoPropiedad,tipoOperacion,descripcion,m2T,m2C,recamaras,banios,mapa_url,latitud,longitud"
 
 # ==============================================================================
@@ -73,34 +70,44 @@ def buscar_por_clave(clave):
         print(f"[ERROR BUSQUEDA CLAVE] {e}")
         return []
 
-def buscar_propiedades(tipo_inmueble, zona, presupuesto, mostrar_mix_general=False):
+def buscar_propiedades(tipo_inmueble, tipo_operacion, zona, presupuesto, mostrar_mix_general=False):
+    """Búsqueda Escalonada: De estricta a flexible para nunca dejar la lista vacía."""
     try:
+        # FASE 1: BÚSQUEDA IDEAL
         query = supabase.table("propiedades").select(COLUMNAS_PERMITIDAS)
-
-        if tipo_inmueble: query = query.ilike("subtipoPropiedad", f"%{tipo_inmueble}%")
-
+        if tipo_operacion: query = query.ilike("tipoOperacion", f"%{tipo_operacion}%")
+        if tipo_inmueble: query = query.ilike("subtipoPropiedad", f"%{tipo_inmueble[:4]}%") 
+        
         if zona and zona.lower() != "sugerencias":
             zona_busqueda = f"municipio.ilike.*{zona}*,colonia.ilike.*{zona}*,nombre.ilike.*{zona}*"
             query = query.or_(zona_busqueda)
 
-        # 🧠 PRESUPUESTO: Funciona como TOPE y ordena de mayor a menor
-        if presupuesto:
-            max_p = presupuesto * 1.2
-            query = query.lte("precio", max_p).order("precio", desc=True)
+        if presupuesto: query = query.lte("precio", presupuesto * 1.2).order("precio", desc=True)
 
         res = query.execute()
         propiedades = res.data
 
-        # 🚨 RED DE SEGURIDAD
+        # FASE 2: BÚSQUEDA FLEXIBLE (Sin Zona)
         if not propiedades:
-            print(f"[DB] Búsqueda específica vacía. Activando Red de Seguridad.")
-            query_mix = supabase.table("propiedades").select(COLUMNAS_PERMITIDAS).limit(4)
-            if presupuesto:
-                query_mix = query_mix.lte("precio", presupuesto * 1.2).order("precio", desc=True)
-            res_mix = query_mix.execute()
-            propiedades = res_mix.data
+            print("[DB] Búsqueda 1 vacía. Intentando Fase 2 (Sin Zona)...")
+            query_f2 = supabase.table("propiedades").select(COLUMNAS_PERMITIDAS)
+            if tipo_operacion: query_f2 = query_f2.ilike("tipoOperacion", f"%{tipo_operacion}%")
+            if tipo_inmueble: query_f2 = query_f2.ilike("subtipoPropiedad", f"%{tipo_inmueble[:4]}%")
+            if presupuesto: query_f2 = query_f2.lte("precio", presupuesto * 1.2).order("precio", desc=True)
+            res_f2 = query_f2.execute()
+            propiedades = res_f2.data
+
+        # FASE 3: MODO SUPERVIVENCIA (Solo Operación y Presupuesto)
+        if not propiedades:
+            print("[DB] Búsqueda 2 vacía. Intentando Fase 3 (Modo Supervivencia)...")
+            query_f3 = supabase.table("propiedades").select(COLUMNAS_PERMITIDAS)
+            if tipo_operacion: query_f3 = query_f3.ilike("tipoOperacion", f"%{tipo_operacion}%")
+            if presupuesto: query_f3 = query_f3.lte("precio", presupuesto * 1.2).order("precio", desc=True)
+            if not presupuesto and not tipo_operacion: query_f3 = query_f3.order("id", desc=True)
+            res_f3 = query_f3.execute()
+            propiedades = res_f3.data
         
-        return propiedades[:4]
+        return propiedades[:4] if propiedades else []
     except Exception as e:
         print(f"[ERROR DB BUSQUEDA] {e}")
         return []

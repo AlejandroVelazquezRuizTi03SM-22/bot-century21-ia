@@ -18,30 +18,23 @@ async def whatsapp_reply(
     MediaUrl0: str = Form(default=""),          
     MediaContentType0: str = Form(default="")   
 ):
-    # 0. DETECCIÓN DE AUDIO
     if NumMedia != "0" and "audio" in MediaContentType0:
         texto_transcrito = utils.descargar_y_transcribir_audio(MediaUrl0)
         Body = texto_transcrito
 
     print(f"\n[MENSAJE] {From} → {Body}")
 
-    # ==============================================================================
-    # 🕵️‍♂️ MÓDULO VIP: AUTO-SERVICIO PARA ASESORES
-    # ==============================================================================
     nombre_asesor = database.obtener_asesor_por_telefono(From)
     if nombre_asesor and ("reporte" in Body.lower() or "inventario" in Body.lower()):
-        # Cambia esta URL cuando subas el proyecto a Render
         base_url = "https://TU-URL-DE-RENDER.onrender.com" 
         link_descarga = f"{base_url}/descargar/{nombre_asesor.replace(' ', '%20')}"
         mensaje_vip = f"👋 Hola colega *{nombre_asesor}*.\n\nAquí tienes tu reporte de inventario:\n📄 {link_descarga}\n\n¡Éxito en tus ventas! 🏠"
         xml = f"""<?xml version="1.0" encoding="UTF-8"?><Response><Message>{mensaje_vip}</Message></Response>"""
         return Response(content=xml.strip(), media_type="text/xml")
 
-    # 1. LEER BD
     cliente_db = database.obtener_cliente(From)
     historial = (cliente_db.get("observaciones_generales") or "")[-600:] if cliente_db else ""
 
-    # 2. ANALISTA IA
     datos_msg = {}
     try:
         resp = (agent.prompt_analista | agent.llm_analista).invoke({"mensaje": Body})
@@ -50,7 +43,6 @@ async def whatsapp_reply(
         if match: datos_msg = json.loads(match.group())
     except: pass
 
-    # 3. FUSIÓN
     def fusionar(campo, es_numero=False):
         val_msg = utils.limpiar_numero(datos_msg.get(campo)) if es_numero else utils.limpiar_texto(datos_msg.get(campo))
         val_db = (utils.limpiar_numero(cliente_db.get(campo)) if es_numero else utils.limpiar_texto(cliente_db.get(campo))) if cliente_db else None
@@ -60,6 +52,7 @@ async def whatsapp_reply(
         "nombre_cliente": fusionar("nombre_cliente"),
         "zona_municipio": fusionar("zona_municipio"),
         "tipo_inmueble": fusionar("tipo_inmueble"),
+        "tipo_operacion": fusionar("tipo_operacion"),
         "presupuesto": fusionar("presupuesto", es_numero=True),
         "clave_propiedad": datos_msg.get("clave_propiedad"),
         "origen_campana": datos_msg.get("origen_campana")
@@ -67,7 +60,6 @@ async def whatsapp_reply(
 
     if datos_finales["origen_campana"]: datos_msg["origen"] = datos_finales["origen_campana"]
 
-    # 5. ESTRATEGIA DE BÚSQUEDA
     inventario = ""
     propiedades = []
     faltante = "Ninguno"
@@ -82,11 +74,13 @@ async def whatsapp_reply(
 
         if faltante == "Ninguno" or quiere_ver:
             propiedades = database.buscar_propiedades(
-                datos_finales["tipo_inmueble"], datos_finales["zona_municipio"],
-                datos_finales["presupuesto"], mostrar_mix_general=(quiere_ver and not datos_finales["zona_municipio"])
+                datos_finales["tipo_inmueble"], 
+                datos_finales["tipo_operacion"],
+                datos_finales["zona_municipio"],
+                datos_finales["presupuesto"], 
+                mostrar_mix_general=(quiere_ver and not datos_finales["zona_municipio"])
             )
 
-    # 6. CONSTRUCCIÓN DE LA FICHA TÉCNICA
     if propiedades:
         for p in propiedades:
             id_prop = p.get('id') 
@@ -102,7 +96,6 @@ async def whatsapp_reply(
             banos = p.get('banios') or 0 
             habs = p.get('recamaras') or p.get('ambientes') or 0 
             
-            # 🗺️ MAPAS
             link_mapa = p.get('mapa_url')
             lat, lon = p.get('latitud'), p.get('longitud')
             if not link_mapa and lat and lon:
@@ -124,16 +117,19 @@ async def whatsapp_reply(
     elif quiere_ver and not datos_finales["clave_propiedad"]:
         inventario = "No encontré coincidencias exactas."
 
-    # 🔓 TRUCO ROMPE-MUROS
     if inventario and ("Referencia:" in inventario or "ID:" in inventario):
         faltante = "Ninguno"
 
-    # 7. GENERACIÓN DE RESPUESTA IA
     try:
         respuesta = (agent.prompt_vendedor | agent.llm_vendedor).invoke({
-            "mensaje": Body, "nombre_final": datos_finales["nombre_cliente"],
-            "zona_final": datos_finales["zona_municipio"], "presupuesto_final": datos_finales["presupuesto"],
-            "dato_faltante_prioritario": faltante, "inventario": inventario, "historial_chat": historial
+            "mensaje": Body, 
+            "nombre_final": datos_finales["nombre_cliente"],
+            "zona_final": datos_finales["zona_municipio"], 
+            "presupuesto_final": datos_finales["presupuesto"],
+            "operacion_final": datos_finales["tipo_operacion"],
+            "dato_faltante_prioritario": faltante, 
+            "inventario": inventario, 
+            "historial_chat": historial
         }).content
     except Exception as e:
         print(f"[ERROR GENERACION] {e}")
@@ -141,16 +137,11 @@ async def whatsapp_reply(
 
     print(f"[BOT] {respuesta}")
 
-    # 8. GUARDADO
     await database.guardar_cliente(Body, respuesta, From, datos_msg, cliente_existente=cliente_db)
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?><Response><Message>{respuesta.replace('&','y')}</Message></Response>"""
     return Response(content=xml.strip(), media_type="text/xml")
 
-
-# ==============================================================================
-# 🪄 ENDPOINT DE REPORTES (LINK MÁGICO)
-# ==============================================================================
 @app.get("/descargar/{nombre_asesor}")
 async def descargar_reporte_asesor(nombre_asesor: str):
     datos = database.obtener_propiedades_por_asesor(nombre_asesor)

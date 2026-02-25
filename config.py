@@ -5,10 +5,15 @@ from pathlib import Path
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+def get_env(name):
+    value = os.getenv(name)
+    if not value:
+        raise ValueError(f"❌ Falta variable de entorno: {name}")
+    return value
 
-# NUEVAS LLAVES DE TWILIO
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+SUPABASE_URL = get_env("SUPABASE_URL")
+SUPABASE_KEY = get_env("SUPABASE_KEY")
+OPENAI_API_KEY = get_env("OPENAI_API_KEY")
+
+TWILIO_ACCOUNT_SID = get_env("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = get_env("TWILIO_AUTH_TOKEN")
