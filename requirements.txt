@@ -1,5 +1,11 @@
 fastapi
 uvicorn
-pydantic
+python-multipart
+supabase
+openai
 langchain
-langchain-ollama
+langchain-openai
+langchain-core
+twilio
+requests
+python-dotenv
