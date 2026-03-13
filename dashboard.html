@@ -227,10 +227,14 @@
                     const isUnread = (!isBotOn && c.leido === false);
 
                     const div = document.createElement("div");
-                    div.className = `p-4 border-b border-gray-100 cursor-pointer transition-colors duration-200 flex justify-between items-center ${isActive && !isMobile() ? 'bg-gray-50 border-l-4 border-c21-gold' : 'hover:bg-gray-50 border-l-4 border-transparent'}`;
+                    
+                    // AQUI ESTÁ LA MAGIA DEL INDICADOR INSTANTÁNEO:
+                    div.className = `p-4 border-b border-gray-100 cursor-pointer transition-all duration-200 flex justify-between items-center ${isActive && !isMobile() ? 'bg-gray-100 border-l-4 border-l-c21-gold shadow-inner' : 'hover:bg-gray-50 border-l-4 border-transparent'}`;
                     
                     div.onclick = () => {
-                        requiresScroll = true; 
+                        requiresScroll = true;
+                        clienteSeleccionado = c.telefono; // Actualizamos el estado de inmediato
+                        renderListaClientes(); // Re-dibujamos la lista para que el resaltado sea instantáneo
                         cargarChat(c.telefono, c.display, isBotOn, isUnread);
                         mostrarChatMovil();
                     };
@@ -239,13 +243,13 @@
                     const safeMensaje = c.ultimo_mensaje ? String(c.ultimo_mensaje) : "Sin mensajes";
                     const safeDisplay = c.display ? String(c.display) : safeTelefono;
 
-                    const fontWeight = isUnread ? 'font-extrabold text-gray-900' : 'font-bold text-gray-800';
+                    const fontWeight = isUnread ? 'font-extrabold text-gray-900' : (isActive ? 'font-bold text-c21-gold' : 'font-bold text-gray-800');
                     const dotIndicator = isUnread ? `<span class="inline-block w-2 h-2 bg-green-500 rounded-full ml-2 shadow-sm animate-pulse"></span>` : '';
 
                     div.innerHTML = `
                         <div class="flex-1 min-w-0 pr-4">
                             <div class="flex items-center">
-                                <p class="${fontWeight} text-sm truncate">${safeDisplay}</p>
+                                <p class="${fontWeight} text-sm truncate transition-colors">${safeDisplay}</p>
                                 ${dotIndicator}
                             </div>
                             <p class="text-xs text-gray-500 mb-1">${safeTelefono}</p>
@@ -297,9 +301,6 @@
                     return;
                 }
 
-                // ==========================================
-                // LÓGICA DE AGRUPACIÓN MULTILÍNEA
-                // ==========================================
                 const lineas = data[0].observaciones_generales.split(/\r?\n/);
                 let mensajesAgrupados = [];
                 let mensajeActual = null;
@@ -419,9 +420,6 @@
             }
         }
 
-        // =====================================
-        // MODAL DE ASESORES
-        // =====================================
         function abrirModalAsesores() {
             document.getElementById('modal-asesores').classList.remove('hidden');
             cargarAsesoresModal();
