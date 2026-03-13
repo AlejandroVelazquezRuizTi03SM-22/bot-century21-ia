@@ -143,13 +143,31 @@
         function volverALista() { if(isMobile()) document.body.classList.remove('chat-mobile-active'); }
 
         // ==========================================
-        // NUEVA FUNCIÓN: DETECTOR DE ENLACES (REGEX)
+        // NUEVA LÓGICA: DETECTOR INTELIGENTE DE ENLACES
         // ==========================================
         function formatearEnlaces(texto) {
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            return texto.replace(urlRegex, function(url) {
-                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="underline font-bold hover:opacity-75 break-all cursor-pointer" title="Abrir enlace en nueva pestaña">${url}</a>`;
+            // 1. Detectar formato Markdown: [Texto descriptivo](https://enlace.com)
+            // Extrae el nombre y la URL ignorando los corchetes y paréntesis
+            let procesado = texto.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(match, nombre, url) {
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="underline font-bold text-blue-400 hover:text-blue-300 break-all cursor-pointer" title="Abrir enlace">${nombre} <i class="fa-solid fa-external-link-alt text-[10px] ml-1"></i></a>`;
             });
+
+            // 2. Detectar URLs sueltas en el texto (que no hayan sido procesadas arriba)
+            // Detiene la lectura si encuentra un paréntesis de cierre, coma o espacio
+            const urlSueltasRegex = /(^|\s)(https?:\/\/[^\s)]+)/g;
+            procesado = procesado.replace(urlSueltasRegex, function(match, espacioAtras, url) {
+                let puntuacionFinal = '';
+                let lastChar = url.slice(-1);
+                
+                if (['.', ',', ';', ':'].includes(lastChar)) {
+                    url = url.slice(0, -1);
+                    puntuacionFinal = lastChar;
+                }
+                
+                return `${espacioAtras}<a href="${url}" target="_blank" rel="noopener noreferrer" class="underline font-bold hover:opacity-75 break-all cursor-pointer" title="Abrir enlace">${url}</a>${puntuacionFinal}`;
+            });
+
+            return procesado;
         }
 
         async function cargarClientes() {
