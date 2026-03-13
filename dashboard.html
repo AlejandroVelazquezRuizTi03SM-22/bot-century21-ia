@@ -142,6 +142,16 @@
         function mostrarChatMovil() { if(isMobile()) document.body.classList.add('chat-mobile-active'); }
         function volverALista() { if(isMobile()) document.body.classList.remove('chat-mobile-active'); }
 
+        // ==========================================
+        // NUEVA FUNCIÓN: DETECTOR DE ENLACES (REGEX)
+        // ==========================================
+        function formatearEnlaces(texto) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return texto.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="underline font-bold hover:opacity-75 break-all cursor-pointer" title="Abrir enlace en nueva pestaña">${url}</a>`;
+            });
+        }
+
         async function cargarClientes() {
             try {
                 const res = await fetch("/conversaciones");
@@ -228,13 +238,12 @@
 
                     const div = document.createElement("div");
                     
-                    // AQUI ESTÁ LA MAGIA DEL INDICADOR INSTANTÁNEO:
                     div.className = `p-4 border-b border-gray-100 cursor-pointer transition-all duration-200 flex justify-between items-center ${isActive && !isMobile() ? 'bg-gray-100 border-l-4 border-l-c21-gold shadow-inner' : 'hover:bg-gray-50 border-l-4 border-transparent'}`;
                     
                     div.onclick = () => {
                         requiresScroll = true;
-                        clienteSeleccionado = c.telefono; // Actualizamos el estado de inmediato
-                        renderListaClientes(); // Re-dibujamos la lista para que el resaltado sea instantáneo
+                        clienteSeleccionado = c.telefono; 
+                        renderListaClientes(); 
                         cargarChat(c.telefono, c.display, isBotOn, isUnread);
                         mostrarChatMovil();
                     };
@@ -330,12 +339,15 @@
 
                     if (rawContent.startsWith("Cliente:")) {
                         let text = rawContent.replace('Cliente:', '').trim();
+                        text = formatearEnlaces(text); // Transforma enlaces a clicleables
                         chat.innerHTML += `<div class="flex justify-start"><div class="bg-white text-gray-800 p-3 md:p-4 rounded-xl rounded-tl-sm max-w-[85%] md:max-w-2xl shadow-sm border border-gray-100"><p class="text-[13px] md:text-[14px] whitespace-pre-wrap leading-relaxed">${text}${timeHtml}</p></div></div>`;
                     } else if (rawContent.startsWith("Bot:")) {
                         let text = rawContent.replace('Bot:', '').trim();
+                        text = formatearEnlaces(text); // Transforma enlaces a clicleables
                         chat.innerHTML += `<div class="flex justify-end"><div class="bg-c21-black text-white p-3 md:p-4 rounded-xl rounded-tr-sm max-w-[85%] md:max-w-2xl shadow-md border border-gray-800"><span class="text-[9px] md:text-[10px] font-bold text-c21-gold block mb-1 uppercase tracking-wider"><i class="fa-solid fa-robot mr-1"></i> IA Diamante</span><p class="text-[13px] md:text-[14px] whitespace-pre-wrap leading-relaxed text-gray-100">${text}${timeHtml}</p></div></div>`;
                     } else if (rawContent.startsWith("Asesor:")) {
                         let text = rawContent.replace('Asesor:', '').trim();
+                        text = formatearEnlaces(text); // Transforma enlaces a clicleables
                         chat.innerHTML += `<div class="flex justify-end"><div class="bg-c21-gold text-white p-3 md:p-4 rounded-xl rounded-tr-sm max-w-[85%] md:max-w-2xl shadow-md"><span class="text-[9px] md:text-[10px] font-bold text-[#fcfcfc] block mb-1 uppercase tracking-wider"><i class="fa-solid fa-user-tie mr-1"></i> Tú</span><p class="text-[13px] md:text-[14px] whitespace-pre-wrap leading-relaxed">${text}${timeHtml}</p></div></div>`;
                     }
                 });
