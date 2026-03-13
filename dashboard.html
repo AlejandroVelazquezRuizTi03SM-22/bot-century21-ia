@@ -188,7 +188,6 @@
         let filtroSoloHumanos = false;
         let filtroNoLeidos = false;
 
-        // Variables globales para el reporte
         let datosReporteActual = [];
         let claveReporteActual = "";
 
@@ -485,9 +484,6 @@
             }
         }
 
-        // =====================================
-        // MODAL DE ASESORES
-        // =====================================
         function abrirModalAsesores() {
             document.getElementById('modal-asesores').classList.remove('hidden');
             cargarAsesoresModal();
@@ -548,7 +544,7 @@
         }
 
         // =====================================
-        // NUEVO: MODAL DE REPORTES
+        // MODAL DE REPORTES Y DESCARGA EXCEL
         // =====================================
         function abrirModalReportes() {
             document.getElementById('modal-reportes').classList.remove('hidden');
@@ -613,33 +609,43 @@
             }
         }
 
+        // =====================================
+        // EXPORTADOR CSV BLINDADO
+        // =====================================
         function exportarCSVReporte() {
-            if(!datosReporteActual || datosReporteActual.length === 0) return;
+            if(!datosReporteActual || datosReporteActual.length === 0) {
+                alert("⚠️ Primero busca una propiedad que tenga prospectos antes de descargar.");
+                return;
+            }
             
             // Creamos las cabeceras del Excel
             let csvContent = "Fecha,Nombre,Telefono,Presupuesto,Zona\n";
             
             datosReporteActual.forEach(c => {
-                // Limpiamos comas para no romper el formato CSV
-                let nombre = (c.nombre_cliente || "Desconocido").replace(/,/g, " ");
-                let tel = (c.telefono || "").replace("whatsapp:", "");
-                let pres = (c.presupuesto || "").replace(/,/g, "");
-                let zona = (c.zona_municipio || "").replace(/,/g, " ");
-                let fecha = c.fecha_contacto || "";
+                // BLINDAJE: Envolvemos todo en String() para que los números no rompan el .replace()
+                let nombre = String(c.nombre_cliente || "Desconocido").replace(/,/g, " ").replace(/\n/g, " ");
+                let tel = String(c.telefono || "").replace("whatsapp:", "");
+                let pres = String(c.presupuesto || "").replace(/,/g, "");
+                let zona = String(c.zona_municipio || "").replace(/,/g, " ").replace(/\n/g, " ");
+                let fecha = String(c.fecha_contacto || "");
                 
                 csvContent += `${fecha},${nombre},${tel},${pres},${zona}\n`;
             });
             
-            // El \ufeff (BOM) asegura que Excel lea los acentos de la "áéí" perfectamente
-            const blob = new Blob(["\ufeff", csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Interesados_Propiedad_${claveReporteActual}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            try {
+                // El \ufeff (BOM) asegura que Excel lea los acentos perfectamente
+                const blob = new Blob(["\ufeff", csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                
+                link.setAttribute("href", url);
+                link.setAttribute("download", `Interesados_Propiedad_${claveReporteActual}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (error) {
+                alert("Hubo un error al generar el archivo. Por favor, intenta de nuevo.");
+            }
         }
 
         setInterval(() => {
