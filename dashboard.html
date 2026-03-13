@@ -207,7 +207,7 @@
                 const cumpleTexto = nombre.includes(textoBuscado) || tel.includes(textoBuscado);
                 
                 const isBotOn = (c.bot_encendido !== false);
-                const isUnread = (!isBotOn && c.leido === false); // Usa la BD real
+                const isUnread = (!isBotOn && c.leido === false);
                 
                 const cumpleHumano = filtroSoloHumanos ? (!isBotOn) : true;
                 const cumpleNoLeido = filtroNoLeidos ? isUnread : true;
@@ -279,10 +279,8 @@
             document.getElementById("telefonoCliente").textContent = String(telefono).replace('whatsapp:', '');
             actualizarUIBoton();
 
-            // Lógica de "Marcar como Leído" al abrir el chat
             if(isUnread) {
                 fetch(`/api/marcar_leido/${encodeURIComponent(telefono)}`, { method: 'POST' });
-                // Actualizamos el array local para que se despinten los puntos verdes sin tener que recargar
                 let clienteMemoria = todosLosClientes.find(c => c.telefono === telefono);
                 if(clienteMemoria) clienteMemoria.leido = true;
                 renderListaClientes();
@@ -299,13 +297,31 @@
                     return;
                 }
 
+                // ==========================================
+                // LÓGICA DE AGRUPACIÓN MULTILÍNEA
+                // ==========================================
                 const lineas = data[0].observaciones_generales.split(/\r?\n/);
-                lineas.forEach(linea => {
-                    if(!linea.trim()) return;
-                    let timeHtml = "";
-                    let rawContent = linea;
+                let mensajesAgrupados = [];
+                let mensajeActual = null;
 
+                lineas.forEach(linea => {
+                    if(!linea.trim() && !mensajeActual) return;
+                    
+                    const esNuevoMensaje = linea.match(/^(?:\[\d{2}:\d{2}\]\s*)?(Cliente:|Bot:|Asesor:)/);
+
+                    if (esNuevoMensaje) {
+                        if (mensajeActual) mensajesAgrupados.push(mensajeActual);
+                        mensajeActual = linea;
+                    } else if (mensajeActual) {
+                        mensajeActual += "\n" + linea;
+                    }
+                });
+                if (mensajeActual) mensajesAgrupados.push(mensajeActual);
+
+                mensajesAgrupados.forEach(rawContent => {
+                    let timeHtml = "";
                     const timeMatch = rawContent.match(/^\[(\d{2}:\d{2})\]\s*/);
+                    
                     if (timeMatch) {
                         timeHtml = `<span class="text-[10px] opacity-60 ml-3 float-right mt-3 font-medium">${timeMatch[1]}</span>`;
                         rawContent = rawContent.replace(timeMatch[0], "");
@@ -468,7 +484,6 @@
         setInterval(() => {
             cargarClientes();
             if(clienteSeleccionado && !bloqueadoPorEnvio) {
-                // Pasamos false a isUnread para que no haga la peticion HTTP cada 8 seg si ya estamos dentro
                 cargarChat(clienteSeleccionado, document.getElementById("nombreCliente").textContent, estadoBotActual, false);
             }
         }, 8000);
