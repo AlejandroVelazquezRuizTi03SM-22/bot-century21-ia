@@ -432,3 +432,18 @@ def toggle_asesor(id_asesor: int, req: ToggleAsesorRequest):
         return {"status": "ok", "activo": req.estado}
     except Exception as e:
         return {"status": "error"}
+
+# ================================================================
+# NUEVO: ENDPOINT DE REPORTES POR PROPIEDAD
+# ================================================================
+@app.get("/api/reportes/propiedad/{clave}")
+def reporte_propiedad(clave: str):
+    try:
+        # Buscamos clientes que tengan esta clave en su registro usando la columna correcta
+        res = database.supabase.table("clientes").select("fecha_contacto,nombre_cliente,telefono,presupuesto,zona_municipio").eq("id_propiedad_opcional", clave).execute()
+        datos = res.data
+                
+        return {"status": "ok", "resultados": datos}
+    except Exception as e:
+        print(f"[ERROR REPORTES] Fallo al generar reporte: {e}")
+        return {"status": "error", "detalle": str(e)}
