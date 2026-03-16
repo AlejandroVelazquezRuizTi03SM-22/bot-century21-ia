@@ -9,7 +9,6 @@ import config
 import database
 import whatsapp_notifier
 
-# Creamos un "Mini-FastAPI" llamado APIRouter
 router = APIRouter()
 
 # ==============================================================================
@@ -29,7 +28,6 @@ class ToggleAsesorRequest(BaseModel):
 # ==============================================================================
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
-    # os.path.dirname(__file__) detecta que ahora estamos dentro de la carpeta /dashboard
     base_path = os.path.dirname(__file__)
     path = os.path.join(base_path, "dashboard.html")
     with open(path, "r", encoding="utf-8") as f:
@@ -160,7 +158,8 @@ def toggle_asesor(id_asesor: int, req: ToggleAsesorRequest):
 @router.get("/api/reportes/propiedad/{clave}")
 def reporte_propiedad(clave: str):
     try:
-        res = database.supabase.table("clientes").select("fecha_contacto,nombre_cliente,telefono,presupuesto,zona_municipio").eq("id_propiedad_opcional", clave).execute()
+        # El cambio crucial: select("*") para extraer el perfil completo
+        res = database.supabase.table("clientes").select("*").eq("id_propiedad_opcional", clave).execute()
         return {"status": "ok", "resultados": res.data}
     except Exception as e:
         return {"status": "error", "detalle": str(e)}
