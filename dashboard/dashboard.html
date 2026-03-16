@@ -6,6 +6,9 @@
     <title>Century 21 Diamante - CRM Inteligente</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <style>
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -150,7 +153,7 @@
             <div class="p-6 flex-1 overflow-y-auto bg-white hidden" id="area-resultados-reporte">
                 <div class="flex justify-between items-end mb-4">
                     <h4 class="font-bold text-gray-800 text-lg" id="titulo-resultados-reporte">Resultados</h4>
-                    <button onclick="exportarCSVReporte()" class="text-sm bg-green-600 text-white px-3 py-1.5 rounded flex items-center shadow-sm hover:bg-green-700 transition">
+                    <button onclick="exportarExcelReporte()" class="text-sm bg-green-600 text-white px-3 py-1.5 rounded flex items-center shadow-sm hover:bg-green-700 transition">
                         <i class="fa-solid fa-file-excel mr-2"></i> Descargar Excel
                     </button>
                 </div>
@@ -606,45 +609,52 @@
             }
         }
 
-        function exportarCSVReporte() {
+        // =======================================================
+        // NUEVO: EXPORTADOR DE EXCEL NATIVO (.XLSX) CON SHEETJS
+        // =======================================================
+        function exportarExcelReporte() {
             if(!datosReporteActual || datosReporteActual.length === 0) {
                 alert("⚠️ Primero busca una propiedad que tenga prospectos antes de descargar.");
                 return;
             }
-            
-            // CABECERAS ESTRICTAS SOLICITADAS
-            let csvContent = "ID,Nombre,Fecha,Hora,Presupuesto,Historial de Chat\n";
-            
-            datosReporteActual.forEach(c => {
-                let id = c.id || "S/N";
-                // Limpiamos comillas dobles existentes para no romper el CSV
-                let nombre = String(c.nombre_cliente || "Desconocido").replace(/"/g, '""');
-                let fecha = String(c.fecha_contacto || "");
-                let hora = String(c.hora_contacto || "");
-                let pres = String(c.presupuesto || "").replace(/,/g, "");
+
+            // 1. Formateamos los datos para que Excel los entienda perfectamente
+            const datosFormateados = datosReporteActual.map(c => {
+                // Reemplazamos los saltos de línea del chat por viñetas " • " para evitar filas gigantes
+                let chatLimpio = String(c.observaciones_generales || "").replace(/\n/g, "  •  ");
                 
-                // BLINDAJE DEL CHAT: Reemplazamos " por "" y envolvemos todo el historial en comillas dobles
-                // Esto fuerza a Excel a leer todo el historial dentro de UNA SOLA CELDA, aunque tenga Enters y comas.
-                let chat = String(c.observaciones_generales || "").replace(/"/g, '""');
-                
-                // Formato CSV estándar estricto
-                csvContent += `"${id}","${nombre}","${fecha}","${hora}","${pres}","${chat}"\n`;
+                // Limpiamos el presupuesto para que Excel lo trate como un número real
+                let presupuestoLimpio = c.presupuesto ? parseFloat(String(c.presupuesto).replace(/,/g, "")) : 0;
+
+                return {
+                    "ID Prospecto": c.id || "S/N",
+                    "Nombre de Cliente": c.nombre_cliente || "Desconocido",
+                    "Fecha de Contacto": c.fecha_contacto || "",
+                    "Hora de Contacto": c.hora_contacto || "",
+                    "Presupuesto Estimado": presupuestoLimpio,
+                    "Historial de Chat": chatLimpio
+                };
             });
-            
-            try {
-                // El \ufeff (BOM) asegura que Excel lea los acentos de la "áéí" perfectamente
-                const blob = new Blob(["\ufeff", csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                
-                link.setAttribute("href", url);
-                link.setAttribute("download", `Reporte_Propiedad_${claveReporteActual}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (error) {
-                alert("Hubo un error al generar el archivo. Por favor, intenta de nuevo.");
-            }
+
+            // 2. Convertimos nuestra data formateada en una "Hoja de Cálculo"
+            const worksheet = XLSX.utils.json_to_sheet(datosFormateados);
+
+            // 3. Ajustamos inteligentemente el ancho de las columnas (wch = width character)
+            worksheet['!cols'] = [
+                { wch: 15 },  // Ancho para ID
+                { wch: 30 },  // Ancho para Nombre
+                { wch: 18 },  // Ancho para Fecha
+                { wch: 18 },  // Ancho para Hora
+                { wch: 25 },  // Ancho para Presupuesto
+                { wch: 120 }  // Ancho para Chat (mucho espacio para que quepa bien)
+            ];
+
+            // 4. Creamos el archivo y le metemos la hoja
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Prospectos");
+
+            // 5. ¡Descargamos el archivo .xlsx nativo!
+            XLSX.writeFile(workbook, `Reporte_Propiedad_${claveReporteActual}.xlsx`);
         }
 
         setInterval(() => {
