@@ -158,8 +158,9 @@ def toggle_asesor(id_asesor: int, req: ToggleAsesorRequest):
 @router.get("/api/reportes/propiedad/{clave}")
 def reporte_propiedad(clave: str):
     try:
-        # El cambio crucial: select("*") para extraer el perfil completo
-        res = database.supabase.table("clientes").select("*").eq("id_propiedad_opcional", clave).execute()
+        # Optimizacion: Pedimos EXACTAMENTE las columnas que requiere el Excel
+        columnas = "id,nombre_cliente,fecha_contacto,hora_contacto,presupuesto,observaciones_generales"
+        res = database.supabase.table("clientes").select(columnas).eq("id_propiedad_opcional", clave).execute()
         return {"status": "ok", "resultados": res.data}
     except Exception as e:
         return {"status": "error", "detalle": str(e)}
