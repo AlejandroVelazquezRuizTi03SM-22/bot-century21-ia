@@ -155,26 +155,17 @@ def toggle_asesor(id_asesor: int, req: ToggleAsesorRequest):
     except Exception:
         return {"status": "error"}
 
-# ==============================================================================
-# NUEVO: AGRUPADOR DE PROPIEDADES (Para listar las que tienen clientes)
-# ==============================================================================
 @router.get("/api/reportes/resumen")
 def obtener_resumen_reportes():
     try:
-        # Traemos todas las filas que tienen una propiedad registrada
         res = database.supabase.table("clientes").select("id_propiedad_opcional").neq("id_propiedad_opcional", "").execute()
-        
-        # Agrupamos y contamos cuántos prospectos tiene cada propiedad
         conteo = {}
         for row in res.data:
             prop_id = row.get("id_propiedad_opcional")
             if prop_id and prop_id.strip() and str(prop_id).lower() != "none":
                 conteo[prop_id] = conteo.get(prop_id, 0) + 1
-                
-        # Convertimos a lista y ordenamos para que las más populares salgan arriba
         lista_resumen = [{"clave": k, "interesados": v} for k, v in conteo.items()]
         lista_resumen.sort(key=lambda x: x["interesados"], reverse=True)
-        
         return {"status": "ok", "resultados": lista_resumen}
     except Exception as e:
         return {"status": "error", "detalle": str(e)}
@@ -182,7 +173,8 @@ def obtener_resumen_reportes():
 @router.get("/api/reportes/propiedad/{clave}")
 def reporte_propiedad(clave: str):
     try:
-        columnas = "id,nombre_cliente,fecha_contacto,hora_contacto,presupuesto,observaciones_generales"
+        # AQUI AGREGAMOS LA COLUMNA "telefono"
+        columnas = "id,nombre_cliente,telefono,fecha_contacto,hora_contacto,presupuesto,observaciones_generales"
         res = database.supabase.table("clientes").select(columnas).eq("id_propiedad_opcional", clave).execute()
         return {"status": "ok", "resultados": res.data}
     except Exception as e:

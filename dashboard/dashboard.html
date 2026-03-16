@@ -167,6 +167,9 @@
         let filtroSoloHumanos = false;
         let filtroNoLeidos = false;
 
+        let datosReporteActual = [];
+        let claveReporteActual = "";
+
         const isMobile = () => window.innerWidth < 768;
         function mostrarChatMovil() { if(isMobile()) document.body.classList.add('chat-mobile-active'); }
         function volverALista() { if(isMobile()) document.body.classList.remove('chat-mobile-active'); }
@@ -519,16 +522,12 @@
             } catch (error) {}
         }
 
-        // ==========================================================
-        // NUEVA LÓGICA: CARGA AUTOMÁTICA DE LISTA DE PROPIEDADES
-        // ==========================================================
         async function abrirModalReportes() {
             document.getElementById('modal-reportes').classList.remove('hidden');
             document.getElementById('lista-propiedades-reporte').innerHTML = '';
             document.getElementById('loader-reportes').classList.remove('hidden');
 
             try {
-                // Hacemos la consulta a nuestro nuevo endpoint de resumen en Python
                 const res = await fetch("/api/reportes/resumen");
                 const data = await res.json();
                 document.getElementById('loader-reportes').classList.add('hidden');
@@ -536,7 +535,6 @@
                 const contenedor = document.getElementById('lista-propiedades-reporte');
                 
                 if(data.status === "ok" && data.resultados && data.resultados.length > 0) {
-                    // Dibujamos cada propiedad con su boton de Excel individual
                     data.resultados.forEach(item => {
                         contenedor.innerHTML += `
                             <div class="flex justify-between items-center p-5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -563,25 +561,24 @@
             document.getElementById('modal-reportes').classList.add('hidden');
         }
 
-        // ==========================================================
-        // EXPORTADOR NATIVO (.XLSX) DIRECTO DESDE EL BOTÓN
-        // ==========================================================
         async function descargarExcelDirecto(clave) {
             try {
-                // 1. Pedimos los datos completos de ESA propiedad a Python
                 const res = await fetch(`/api/reportes/propiedad/${encodeURIComponent(clave)}`);
                 const responseData = await res.json();
                 
                 if(responseData.status === "ok" && responseData.resultados && responseData.resultados.length > 0) {
                     
-                    // 2. Limpiamos y preparamos la data
                     const datosParaExcel = responseData.resultados.map(c => {
                         let chatLimpio = String(c.observaciones_generales || "").replace(/\n/g, "  •  ");
                         let presupuestoLimpio = c.presupuesto ? parseFloat(String(c.presupuesto).replace(/,/g, "")) : 0;
+                        
+                        // AQUI LIMPIAMOS EL TELÉFONO (le quitamos el whatsapp:)
+                        let telefonoLimpio = String(c.telefono || "S/N").replace("whatsapp:", "");
 
                         return {
                             "ID Prospecto": c.id || "S/N",
                             "Nombre de Cliente": c.nombre_cliente || "Desconocido",
+                            "Teléfono": telefonoLimpio, // NUEVA COLUMNA AGREGADA
                             "Fecha de Contacto": c.fecha_contacto || "",
                             "Hora de Contacto": c.hora_contacto || "",
                             "Presupuesto Estimado": presupuestoLimpio,
@@ -589,11 +586,11 @@
                         };
                     });
 
-                    // 3. Generamos el Excel .xlsx
                     const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
                     worksheet['!cols'] = [
                         { wch: 15 },  // ID
                         { wch: 30 },  // Nombre
+                        { wch: 20 },  // Teléfono (Ancho nuevo)
                         { wch: 18 },  // Fecha
                         { wch: 18 },  // Hora
                         { wch: 25 },  // Presupuesto
