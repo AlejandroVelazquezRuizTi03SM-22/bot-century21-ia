@@ -136,46 +136,22 @@
     </div>
 
     <div id="modal-reportes" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center backdrop-blur-sm transition-opacity">
-        <div class="bg-white w-11/12 md:w-[600px] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div class="bg-white w-11/12 md:w-[500px] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div class="bg-c21-black px-6 py-5 flex justify-between items-center shadow-md">
-                <h3 class="text-c21-gold font-bold text-lg"><i class="fa-solid fa-chart-column mr-2"></i> Analítica de Propiedades</h3>
+                <h3 class="text-c21-gold font-bold text-lg"><i class="fa-solid fa-building-circle-check mr-2"></i> Propiedades Consultadas</h3>
                 <button onclick="cerrarModalReportes()" class="text-gray-400 hover:text-white transition-colors focus:outline-none"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
             
-            <div class="p-6 bg-gray-50 border-b border-gray-200">
-                <label class="block text-sm font-bold text-gray-700 mb-2">Clave / ID de la Propiedad</label>
-                <div class="flex space-x-3">
-                    <input type="text" id="input-clave-reporte" placeholder="Ej. 553521" class="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-c21-gold focus:border-transparent text-sm">
-                    <button onclick="buscarReporte()" class="bg-c21-gold text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-[#a88850] transition-colors">Buscar</button>
-                </div>
+            <div class="p-4 bg-gray-50 border-b border-gray-200 text-sm text-gray-600 text-center">
+                Descarga el reporte de prospectos interesados por cada propiedad.
             </div>
 
-            <div class="p-6 flex-1 overflow-y-auto bg-white hidden" id="area-resultados-reporte">
-                <div class="flex justify-between items-end mb-4">
-                    <h4 class="font-bold text-gray-800 text-lg" id="titulo-resultados-reporte">Resultados</h4>
-                    <button onclick="exportarExcelReporte()" class="text-sm bg-green-600 text-white px-3 py-1.5 rounded flex items-center shadow-sm hover:bg-green-700 transition">
-                        <i class="fa-solid fa-file-excel mr-2"></i> Descargar Excel
-                    </button>
+            <div class="p-0 flex-1 overflow-y-auto bg-white" id="lista-propiedades-reporte">
                 </div>
-                
-                <div class="overflow-x-auto rounded-lg border border-gray-200">
-                    <table class="min-w-full text-sm text-left whitespace-nowrap">
-                        <thead class="bg-gray-100 text-gray-600 font-bold uppercase text-[10px]">
-                            <tr>
-                                <th class="px-4 py-3">Fecha</th>
-                                <th class="px-4 py-3">Cliente</th>
-                                <th class="px-4 py-3">Teléfono</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-reportes-body" class="divide-y divide-gray-100">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
             
             <div id="loader-reportes" class="p-10 hidden text-center">
                 <i class="fa-solid fa-spinner fa-spin text-3xl text-c21-gold mb-3"></i>
-                <p class="text-gray-500 text-sm">Analizando base de datos...</p>
+                <p class="text-gray-500 text-sm">Cargando base de datos...</p>
             </div>
         </div>
     </div>
@@ -190,9 +166,6 @@
         let filtroTexto = "";
         let filtroSoloHumanos = false;
         let filtroNoLeidos = false;
-
-        let datosReporteActual = [];
-        let claveReporteActual = "";
 
         const isMobile = () => window.innerWidth < 768;
         function mostrarChatMovil() { if(isMobile()) document.body.classList.add('chat-mobile-active'); }
@@ -546,115 +519,96 @@
             } catch (error) {}
         }
 
-        function abrirModalReportes() {
+        // ==========================================================
+        // NUEVA LÓGICA: CARGA AUTOMÁTICA DE LISTA DE PROPIEDADES
+        // ==========================================================
+        async function abrirModalReportes() {
             document.getElementById('modal-reportes').classList.remove('hidden');
-            document.getElementById('input-clave-reporte').value = '';
-            document.getElementById('area-resultados-reporte').classList.add('hidden');
-            document.getElementById('loader-reportes').classList.add('hidden');
-            datosReporteActual = [];
+            document.getElementById('lista-propiedades-reporte').innerHTML = '';
+            document.getElementById('loader-reportes').classList.remove('hidden');
+
+            try {
+                // Hacemos la consulta a nuestro nuevo endpoint de resumen en Python
+                const res = await fetch("/api/reportes/resumen");
+                const data = await res.json();
+                document.getElementById('loader-reportes').classList.add('hidden');
+
+                const contenedor = document.getElementById('lista-propiedades-reporte');
+                
+                if(data.status === "ok" && data.resultados && data.resultados.length > 0) {
+                    // Dibujamos cada propiedad con su boton de Excel individual
+                    data.resultados.forEach(item => {
+                        contenedor.innerHTML += `
+                            <div class="flex justify-between items-center p-5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                <div>
+                                    <p class="font-bold text-gray-800 text-lg">Propiedad: <span class="text-c21-gold">${item.clave}</span></p>
+                                    <p class="text-xs text-gray-500 mt-1"><i class="fa-solid fa-users mr-1"></i> ${item.interesados} prospecto(s) interesado(s)</p>
+                                </div>
+                                <button onclick="descargarExcelDirecto('${item.clave}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center focus:outline-none">
+                                    <i class="fa-solid fa-file-excel mr-2"></i> Descargar
+                                </button>
+                            </div>
+                        `;
+                    });
+                } else {
+                    contenedor.innerHTML = `<div class="p-8 text-center text-gray-400 italic mt-5">Aún no hay clientes que hayan preguntado por propiedades específicas.</div>`;
+                }
+            } catch (e) {
+                document.getElementById('loader-reportes').classList.add('hidden');
+                alert("Error al cargar la lista de propiedades.");
+            }
         }
 
         function cerrarModalReportes() {
             document.getElementById('modal-reportes').classList.add('hidden');
         }
 
-        async function buscarReporte() {
-            const clave = document.getElementById('input-clave-reporte').value.trim();
-            if(!clave) return;
-
-            claveReporteActual = clave;
-            document.getElementById('area-resultados-reporte').classList.add('hidden');
-            document.getElementById('loader-reportes').classList.remove('hidden');
-
+        // ==========================================================
+        // EXPORTADOR NATIVO (.XLSX) DIRECTO DESDE EL BOTÓN
+        // ==========================================================
+        async function descargarExcelDirecto(clave) {
             try {
+                // 1. Pedimos los datos completos de ESA propiedad a Python
                 const res = await fetch(`/api/reportes/propiedad/${encodeURIComponent(clave)}`);
                 const responseData = await res.json();
                 
-                document.getElementById('loader-reportes').classList.add('hidden');
-                
                 if(responseData.status === "ok" && responseData.resultados && responseData.resultados.length > 0) {
-                    datosReporteActual = responseData.resultados;
                     
-                    document.getElementById('titulo-resultados-reporte').textContent = `${datosReporteActual.length} Prospectos Interesados`;
-                    
-                    const tbody = document.getElementById('tabla-reportes-body');
-                    tbody.innerHTML = "";
-                    
-                    datosReporteActual.forEach(cliente => {
-                        let nombre = cliente.nombre_cliente || "Desconocido";
-                        let tel = (cliente.telefono || "").replace("whatsapp:", "");
-                        let fecha = cliente.fecha_contacto || "Sin fecha";
-                        
-                        tbody.innerHTML += `
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-4 py-3 text-gray-500">${fecha}</td>
-                                <td class="px-4 py-3 font-medium text-gray-800">${nombre}</td>
-                                <td class="px-4 py-3 text-gray-600">${tel}</td>
-                            </tr>
-                        `;
+                    // 2. Limpiamos y preparamos la data
+                    const datosParaExcel = responseData.resultados.map(c => {
+                        let chatLimpio = String(c.observaciones_generales || "").replace(/\n/g, "  •  ");
+                        let presupuestoLimpio = c.presupuesto ? parseFloat(String(c.presupuesto).replace(/,/g, "")) : 0;
+
+                        return {
+                            "ID Prospecto": c.id || "S/N",
+                            "Nombre de Cliente": c.nombre_cliente || "Desconocido",
+                            "Fecha de Contacto": c.fecha_contacto || "",
+                            "Hora de Contacto": c.hora_contacto || "",
+                            "Presupuesto Estimado": presupuestoLimpio,
+                            "Historial de Chat": chatLimpio
+                        };
                     });
+
+                    // 3. Generamos el Excel .xlsx
+                    const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
+                    worksheet['!cols'] = [
+                        { wch: 15 },  // ID
+                        { wch: 30 },  // Nombre
+                        { wch: 18 },  // Fecha
+                        { wch: 18 },  // Hora
+                        { wch: 25 },  // Presupuesto
+                        { wch: 120 }  // Chat
+                    ];
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "Prospectos");
+                    XLSX.writeFile(workbook, `Reporte_Propiedad_${clave}.xlsx`);
                     
-                    document.getElementById('area-resultados-reporte').classList.remove('hidden');
                 } else {
-                    datosReporteActual = [];
-                    const tbody = document.getElementById('tabla-reportes-body');
-                    tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-6 text-center text-gray-400 italic">Nadie ha preguntado por esta propiedad aún.</td></tr>`;
-                    document.getElementById('titulo-resultados-reporte').textContent = `Sin Resultados`;
-                    document.getElementById('area-resultados-reporte').classList.remove('hidden');
+                    alert("No se encontraron datos para descargar.");
                 }
-                
-            } catch (error) {
-                document.getElementById('loader-reportes').classList.add('hidden');
-                alert("Hubo un error de conexión al buscar el reporte.");
+            } catch (e) {
+                alert("Error al intentar descargar el archivo Excel.");
             }
-        }
-
-        // =======================================================
-        // NUEVO: EXPORTADOR DE EXCEL NATIVO (.XLSX) CON SHEETJS
-        // =======================================================
-        function exportarExcelReporte() {
-            if(!datosReporteActual || datosReporteActual.length === 0) {
-                alert("⚠️ Primero busca una propiedad que tenga prospectos antes de descargar.");
-                return;
-            }
-
-            // 1. Formateamos los datos para que Excel los entienda perfectamente
-            const datosFormateados = datosReporteActual.map(c => {
-                // Reemplazamos los saltos de línea del chat por viñetas " • " para evitar filas gigantes
-                let chatLimpio = String(c.observaciones_generales || "").replace(/\n/g, "  •  ");
-                
-                // Limpiamos el presupuesto para que Excel lo trate como un número real
-                let presupuestoLimpio = c.presupuesto ? parseFloat(String(c.presupuesto).replace(/,/g, "")) : 0;
-
-                return {
-                    "ID Prospecto": c.id || "S/N",
-                    "Nombre de Cliente": c.nombre_cliente || "Desconocido",
-                    "Fecha de Contacto": c.fecha_contacto || "",
-                    "Hora de Contacto": c.hora_contacto || "",
-                    "Presupuesto Estimado": presupuestoLimpio,
-                    "Historial de Chat": chatLimpio
-                };
-            });
-
-            // 2. Convertimos nuestra data formateada en una "Hoja de Cálculo"
-            const worksheet = XLSX.utils.json_to_sheet(datosFormateados);
-
-            // 3. Ajustamos inteligentemente el ancho de las columnas (wch = width character)
-            worksheet['!cols'] = [
-                { wch: 15 },  // Ancho para ID
-                { wch: 30 },  // Ancho para Nombre
-                { wch: 18 },  // Ancho para Fecha
-                { wch: 18 },  // Ancho para Hora
-                { wch: 25 },  // Ancho para Presupuesto
-                { wch: 120 }  // Ancho para Chat (mucho espacio para que quepa bien)
-            ];
-
-            // 4. Creamos el archivo y le metemos la hoja
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Prospectos");
-
-            // 5. ¡Descargamos el archivo .xlsx nativo!
-            XLSX.writeFile(workbook, `Reporte_Propiedad_${claveReporteActual}.xlsx`);
         }
 
         setInterval(() => {
