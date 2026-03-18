@@ -23,6 +23,11 @@ class MensajeAsesorRequest(BaseModel):
 class ToggleAsesorRequest(BaseModel):
     estado: bool
 
+# NUEVO: Modelo para recibir los datos de un asesor nuevo
+class NuevoAsesorRequest(BaseModel):
+    nombre: str
+    telefono: str
+
 # ==============================================================================
 # RUTAS DEL DASHBOARD (FRONTEND Y BACKEND)
 # ==============================================================================
@@ -139,10 +144,13 @@ def enviar_mensaje_asesor(telefono: str, req: MensajeAsesorRequest):
         pass
     return {"status": "ok", "bot_encendido": False}
 
+# ==============================================================================
+# GESTIÓN DE ASESORES (CRUD COMPLETO)
+# ==============================================================================
 @router.get("/api/asesores")
 def obtener_asesores():
     try:
-        resp = database.supabase.table("asesores").select("id, nombre, activo").order("id").execute()
+        resp = database.supabase.table("asesores").select("id, nombre, telefono, activo").order("id").execute()
         return resp.data
     except Exception:
         return []
@@ -155,6 +163,37 @@ def toggle_asesor(id_asesor: int, req: ToggleAsesorRequest):
     except Exception:
         return {"status": "error"}
 
+# NUEVO: Endpoint para agregar asesores
+@router.post("/api/asesores")
+def agregar_asesor(req: NuevoAsesorRequest):
+    try:
+        # Nos aseguramos de que el teléfono tenga el formato de WhatsApp de Twilio si no lo tiene
+        tel_limpio = req.telefono.strip()
+        if not tel_limpio.startswith("whatsapp:"):
+            tel_limpio = f"whatsapp:{tel_limpio}"
+
+        nuevo = {
+            "nombre": req.nombre.strip(),
+            "telefono": tel_limpio,
+            "activo": True 
+        }
+        res = database.supabase.table("asesores").insert(nuevo).execute()
+        return {"status": "ok", "data": res.data}
+    except Exception as e:
+        return {"status": "error", "detalle": str(e)}
+
+# NUEVO: Endpoint para eliminar asesores
+@router.delete("/api/asesores/{id_asesor}")
+def eliminar_asesor(id_asesor: int):
+    try:
+        database.supabase.table("asesores").delete().eq("id", id_asesor).execute()
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "detalle": str(e)}
+
+# ==============================================================================
+# REPORTES Y ANALÍTICA
+# ==============================================================================
 @router.get("/api/reportes/resumen")
 def obtener_resumen_reportes():
     try:
@@ -173,7 +212,6 @@ def obtener_resumen_reportes():
 @router.get("/api/reportes/propiedad/{clave}")
 def reporte_propiedad(clave: str):
     try:
-        # AQUI AGREGAMOS LA COLUMNA "telefono"
         columnas = "id,nombre_cliente,telefono,fecha_contacto,hora_contacto,presupuesto,observaciones_generales"
         res = database.supabase.table("clientes").select(columnas).eq("id_propiedad_opcional", clave).execute()
         return {"status": "ok", "resultados": res.data}

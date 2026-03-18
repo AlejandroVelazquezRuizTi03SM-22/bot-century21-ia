@@ -123,14 +123,23 @@
     </div>
 
     <div id="modal-asesores" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center backdrop-blur-sm transition-opacity">
-        <div class="bg-white w-11/12 md:w-[450px] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div class="bg-white w-11/12 md:w-[480px] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div class="bg-c21-black px-6 py-5 flex justify-between items-center shadow-md">
-                <h3 class="text-c21-gold font-bold text-lg"><i class="fa-solid fa-users mr-2"></i> Asesores de Guardia</h3>
+                <h3 class="text-c21-gold font-bold text-lg"><i class="fa-solid fa-users mr-2"></i> Gestión de Asesores</h3>
                 <button onclick="cerrarModalAsesores()" class="text-gray-400 hover:text-white transition-colors focus:outline-none"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
-            <div class="bg-gray-50 px-6 py-3 border-b border-gray-200 text-xs text-gray-500 text-center">
-                El bot solo asignará clientes a los asesores encendidos.
+            
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                <p class="text-xs text-gray-500 font-bold mb-2 uppercase tracking-wide">Añadir Nuevo Asesor</p>
+                <div class="flex space-x-2">
+                    <input type="text" id="nuevo-asesor-nombre" placeholder="Nombre completo" class="w-1/2 rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-c21-gold shadow-sm">
+                    <input type="text" id="nuevo-asesor-telefono" placeholder="Ej. +52427..." class="w-1/2 rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-c21-gold shadow-sm">
+                    <button onclick="agregarAsesor()" class="bg-c21-gold text-white px-4 py-2 rounded font-bold shadow-md hover:bg-[#a88850] transition-colors focus:outline-none">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
             </div>
+
             <div class="p-6 flex-1 overflow-y-auto bg-white" id="lista-asesores-modal"></div>
         </div>
     </div>
@@ -141,14 +150,10 @@
                 <h3 class="text-c21-gold font-bold text-lg"><i class="fa-solid fa-building-circle-check mr-2"></i> Propiedades Consultadas</h3>
                 <button onclick="cerrarModalReportes()" class="text-gray-400 hover:text-white transition-colors focus:outline-none"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
-            
             <div class="p-4 bg-gray-50 border-b border-gray-200 text-sm text-gray-600 text-center">
                 Descarga el reporte de prospectos interesados por cada propiedad.
             </div>
-
-            <div class="p-0 flex-1 overflow-y-auto bg-white" id="lista-propiedades-reporte">
-                </div>
-            
+            <div class="p-0 flex-1 overflow-y-auto bg-white" id="lista-propiedades-reporte"></div>
             <div id="loader-reportes" class="p-10 hidden text-center">
                 <i class="fa-solid fa-spinner fa-spin text-3xl text-c21-gold mb-3"></i>
                 <p class="text-gray-500 text-sm">Cargando base de datos...</p>
@@ -463,6 +468,9 @@
             }
         }
 
+        // ==============================================================================
+        // LÓGICA CRUD DE ASESORES
+        // ==============================================================================
         function abrirModalAsesores() {
             document.getElementById('modal-asesores').classList.remove('hidden');
             cargarAsesoresModal();
@@ -470,6 +478,8 @@
 
         function cerrarModalAsesores() {
             document.getElementById('modal-asesores').classList.add('hidden');
+            document.getElementById('nuevo-asesor-nombre').value = '';
+            document.getElementById('nuevo-asesor-telefono').value = '';
         }
 
         async function cargarAsesoresModal() {
@@ -488,26 +498,79 @@
                 container.innerHTML = "";
                 asesores.forEach(a => {
                     const isActivo = a.activo;
+                    const displayTel = (a.telefono || "Sin número").replace('whatsapp:', '');
                     const row = document.createElement('div');
-                    row.className = "flex justify-between items-center py-4 border-b border-gray-100";
+                    row.className = "flex justify-between items-center py-4 border-b border-gray-100 hover:bg-gray-50 px-2 transition-colors";
                     
                     row.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 mr-4 shadow-inner">
+                        <div class="flex items-center min-w-0 flex-1">
+                            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 mr-4 shadow-inner flex-shrink-0">
                                 <i class="fa-solid fa-user"></i>
                             </div>
-                            <div>
-                                <p class="font-bold text-gray-800 text-sm">${a.nombre}</p>
+                            <div class="min-w-0 pr-2">
+                                <p class="font-bold text-gray-800 text-sm truncate">${a.nombre}</p>
+                                <p class="text-[10px] text-gray-500 truncate">${displayTel}</p>
                                 <p class="text-[10px] uppercase tracking-wide font-bold mt-1 ${isActivo ? 'text-green-500' : 'text-gray-400'}">${isActivo ? 'En Guardia' : 'Fuera de Turno'}</p>
                             </div>
                         </div>
-                        <button onclick="toggleAsesorActivo(${a.id}, ${isActivo})" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isActivo ? 'bg-green-500' : 'bg-gray-300'}">
-                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition shadow-sm ${isActivo ? 'translate-x-6' : 'translate-x-1'}"></span>
-                        </button>
+                        <div class="flex items-center space-x-3 flex-shrink-0">
+                            <button onclick="toggleAsesorActivo(${a.id}, ${isActivo})" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isActivo ? 'bg-green-500' : 'bg-gray-300'}">
+                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition shadow-sm ${isActivo ? 'translate-x-6' : 'translate-x-1'}"></span>
+                            </button>
+                            <button onclick="eliminarAsesor(${a.id})" class="text-red-400 hover:text-red-600 focus:outline-none transition-colors" title="Eliminar Asesor">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
                     `;
                     container.appendChild(row);
                 });
             } catch (error) {}
+        }
+
+        async function agregarAsesor() {
+            const nombre = document.getElementById('nuevo-asesor-nombre').value.trim();
+            const telefono = document.getElementById('nuevo-asesor-telefono').value.trim();
+
+            if (!nombre || !telefono) {
+                alert("Por favor, ingresa el nombre y el número de teléfono del asesor.");
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/asesores", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre: nombre, telefono: telefono })
+                });
+                
+                const data = await res.json();
+                if (data.status === "ok") {
+                    document.getElementById('nuevo-asesor-nombre').value = '';
+                    document.getElementById('nuevo-asesor-telefono').value = '';
+                    cargarAsesoresModal(); // Recargamos la lista
+                } else {
+                    alert("Error al guardar el asesor en la base de datos.");
+                }
+            } catch (error) {
+                alert("Hubo un error de conexión.");
+            }
+        }
+
+        async function eliminarAsesor(id) {
+            const confirmar = confirm("¿Estás seguro de que deseas eliminar permanentemente a este asesor del sistema?");
+            if (!confirmar) return;
+
+            try {
+                const res = await fetch(`/api/asesores/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.status === "ok") {
+                    cargarAsesoresModal(); // Recargamos la lista tras borrar
+                } else {
+                    alert("No se pudo eliminar al asesor.");
+                }
+            } catch (error) {
+                alert("Hubo un error de conexión al intentar borrar.");
+            }
         }
 
         async function toggleAsesorActivo(id, estadoActual) {
@@ -522,6 +585,9 @@
             } catch (error) {}
         }
 
+        // ==============================================================================
+        // LÓGICA DE REPORTES
+        // ==============================================================================
         async function abrirModalReportes() {
             document.getElementById('modal-reportes').classList.remove('hidden');
             document.getElementById('lista-propiedades-reporte').innerHTML = '';
@@ -571,14 +637,12 @@
                     const datosParaExcel = responseData.resultados.map(c => {
                         let chatLimpio = String(c.observaciones_generales || "").replace(/\n/g, "  •  ");
                         let presupuestoLimpio = c.presupuesto ? parseFloat(String(c.presupuesto).replace(/,/g, "")) : 0;
-                        
-                        // AQUI LIMPIAMOS EL TELÉFONO (le quitamos el whatsapp:)
                         let telefonoLimpio = String(c.telefono || "S/N").replace("whatsapp:", "");
 
                         return {
                             "ID Prospecto": c.id || "S/N",
                             "Nombre de Cliente": c.nombre_cliente || "Desconocido",
-                            "Teléfono": telefonoLimpio, // NUEVA COLUMNA AGREGADA
+                            "Teléfono": telefonoLimpio, 
                             "Fecha de Contacto": c.fecha_contacto || "",
                             "Hora de Contacto": c.hora_contacto || "",
                             "Presupuesto Estimado": presupuestoLimpio,
@@ -588,13 +652,13 @@
 
                     const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
                     worksheet['!cols'] = [
-                        { wch: 15 },  // ID
-                        { wch: 30 },  // Nombre
-                        { wch: 20 },  // Teléfono (Ancho nuevo)
-                        { wch: 18 },  // Fecha
-                        { wch: 18 },  // Hora
-                        { wch: 25 },  // Presupuesto
-                        { wch: 120 }  // Chat
+                        { wch: 15 },  
+                        { wch: 30 },  
+                        { wch: 20 },  
+                        { wch: 18 },  
+                        { wch: 18 },  
+                        { wch: 25 },  
+                        { wch: 120 }  
                     ];
                     const workbook = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(workbook, worksheet, "Prospectos");
