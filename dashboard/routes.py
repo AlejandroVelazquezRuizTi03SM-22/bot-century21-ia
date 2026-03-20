@@ -23,7 +23,6 @@ class MensajeAsesorRequest(BaseModel):
 class ToggleAsesorRequest(BaseModel):
     estado: bool
 
-# NUEVO: Modelo para recibir los datos de un asesor nuevo
 class NuevoAsesorRequest(BaseModel):
     nombre: str
     telefono: str
@@ -116,7 +115,8 @@ def enviar_mensaje_asesor(telefono: str, req: MensajeAsesorRequest):
     try:
         client = Client(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN)
         client.messages.create(
-            from_=whatsapp_notifier.TWILIO_NUMERO_BOT,
+            # 🚨 CORRECCIÓN: Aquí estaba el error. Ahora usamos el nombre correcto de la variable.
+            from_=whatsapp_notifier.NUMERO_TWILIO,
             body=req.mensaje,
             to=telefono
         )
@@ -163,11 +163,9 @@ def toggle_asesor(id_asesor: int, req: ToggleAsesorRequest):
     except Exception:
         return {"status": "error"}
 
-# NUEVO: Endpoint para agregar asesores
 @router.post("/api/asesores")
 def agregar_asesor(req: NuevoAsesorRequest):
     try:
-        # Nos aseguramos de que el teléfono tenga el formato de WhatsApp de Twilio si no lo tiene
         tel_limpio = req.telefono.strip()
         if not tel_limpio.startswith("whatsapp:"):
             tel_limpio = f"whatsapp:{tel_limpio}"
@@ -182,7 +180,6 @@ def agregar_asesor(req: NuevoAsesorRequest):
     except Exception as e:
         return {"status": "error", "detalle": str(e)}
 
-# NUEVO: Endpoint para eliminar asesores
 @router.delete("/api/asesores/{id_asesor}")
 def eliminar_asesor(id_asesor: int):
     try:
