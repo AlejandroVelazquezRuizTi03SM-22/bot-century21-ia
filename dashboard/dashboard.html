@@ -58,19 +58,28 @@
             </div>
         </div>
 
-        <div class="bg-white p-3 border-b border-gray-200 flex space-x-2 shadow-sm z-0">
-            <div class="relative flex-1">
-                <i class="fa-solid fa-search absolute left-4 top-3 text-gray-400 text-sm"></i>
-                <input type="text" id="buscador" placeholder="Buscar prospecto..." class="w-full bg-gray-100 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-c21-gold transition-shadow" oninput="filtrarClientes()">
+        <div class="bg-white p-3 border-b border-gray-200 flex flex-col space-y-2 shadow-sm z-0">
+            <div class="flex space-x-2">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-search absolute left-4 top-3 text-gray-400 text-sm"></i>
+                    <input type="text" id="buscador" placeholder="Buscar prospecto..." class="w-full bg-gray-100 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-c21-gold transition-shadow" oninput="filtrarClientes()">
+                </div>
+                <button id="btn-filtro-humano" onclick="toggleFiltroHumano()" class="bg-gray-100 text-gray-500 p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-200 focus:outline-none transition-colors shadow-inner" title="Ver chats atendidos por humano">
+                    <i class="fa-solid fa-user-tie"></i>
+                </button>
+                <button id="btn-filtro-noleidos" onclick="toggleFiltroNoLeidos()" class="bg-gray-100 text-gray-500 p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-200 focus:outline-none transition-colors shadow-inner relative" title="Ver mensajes pendientes">
+                    <i class="fa-solid fa-bell"></i>
+                </button>
             </div>
             
-            <button id="btn-filtro-humano" onclick="toggleFiltroHumano()" class="bg-gray-100 text-gray-500 p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-200 focus:outline-none transition-colors shadow-inner" title="Ver chats atendidos por humano">
-                <i class="fa-solid fa-user-tie"></i>
-            </button>
-            
-            <button id="btn-filtro-noleidos" onclick="toggleFiltroNoLeidos()" class="bg-gray-100 text-gray-500 p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-200 focus:outline-none transition-colors shadow-inner relative" title="Ver mensajes pendientes">
-                <i class="fa-solid fa-bell"></i>
-            </button>
+            <div class="relative">
+                <i class="fa-solid fa-filter absolute left-4 top-2 text-gray-400 text-xs"></i>
+                <select id="filtro-asesor" onchange="filtrarClientes()" class="w-full bg-gray-50 border border-gray-200 rounded-full py-1.5 pl-10 pr-4 text-xs focus:outline-none focus:ring-1 focus:ring-c21-gold text-gray-600 appearance-none cursor-pointer shadow-sm">
+                    <option value="todos">Todos los prospectos (Cualquier asignación)</option>
+                    <option value="sin_asignar">Solo prospectos sin asesor</option>
+                    </select>
+                <i class="fa-solid fa-chevron-down absolute right-4 top-2.5 text-gray-400 text-[10px] pointer-events-none"></i>
+            </div>
         </div>
 
         <div id="listaClientes" class="flex-1 overflow-y-auto bg-white scrollbar-hide pb-20 md:pb-0">
@@ -171,6 +180,7 @@
         let filtroTexto = "";
         let filtroSoloHumanos = false;
         let filtroNoLeidos = false;
+        let filtroAsesor = "todos"; // NUEVA VARIABLE PARA EL FILTRO
 
         let datosReporteActual = [];
         let claveReporteActual = "";
@@ -200,12 +210,42 @@
             try {
                 const res = await fetch("/conversaciones");
                 todosLosClientes = await res.json();
+                actualizarDropdownAsesores(); // LLAMADA AL NUEVO GENERADOR DE FILTRO
                 renderListaClientes();
             } catch (error) {}
         }
 
+        // =========================================================
+        // NUEVA FUNCIÓN: ACTUALIZAR EL MENÚ DESPLEGABLE
+        // =========================================================
+        function actualizarDropdownAsesores() {
+            const select = document.getElementById("filtro-asesor");
+            const valorActual = select.value;
+            
+            let opcionesHTML = `
+                <option value="todos">Todos los prospectos (Cualquier asignación)</option>
+                <option value="sin_asignar">Solo prospectos sin asesor o de Oficina</option>
+            `;
+            
+            // Extraer nombres unicos de asesores que no sean de oficina
+            const asesoresUnicos = [...new Set(todosLosClientes
+                .map(c => c.seguimiento)
+                .filter(s => s && s.trim() !== "" && !s.toLowerCase().includes("oficina")))
+            ];
+            
+            asesoresUnicos.sort().forEach(asesor => {
+                opcionesHTML += `<option value="${asesor}">Asesor: ${asesor}</option>`;
+            });
+            
+            select.innerHTML = opcionesHTML;
+            // Restaurar el valor por si se actualizó la lista pero queremos seguir filtrando
+            select.value = asesoresUnicos.includes(valorActual) || valorActual === "todos" || valorActual === "sin_asignar" ? valorActual : "todos";
+        }
+
+        // SE ACTUALIZÓ PARA LEER EL NUEVO DROPDOWN
         function filtrarClientes() {
             filtroTexto = document.getElementById("buscador").value.toLowerCase();
+            filtroAsesor = document.getElementById("filtro-asesor").value;
             renderListaClientes();
         }
 
@@ -255,6 +295,7 @@
                 const nombre = c.display ? String(c.display).toLowerCase() : "";
                 const tel = c.telefono ? String(c.telefono).toLowerCase() : "";
                 const textoBuscado = filtroTexto ? String(filtroTexto).toLowerCase() : "";
+                const seguimiento = c.seguimiento ? c.seguimiento : "";
                 
                 const cumpleTexto = nombre.includes(textoBuscado) || tel.includes(textoBuscado);
                 const isBotOn = (c.bot_encendido !== false);
@@ -262,7 +303,15 @@
                 const cumpleHumano = filtroSoloHumanos ? (!isBotOn) : true;
                 const cumpleNoLeido = filtroNoLeidos ? isUnread : true;
                 
-                return cumpleTexto && cumpleHumano && cumpleNoLeido;
+                // LÓGICA DEL NUEVO FILTRO POR ASESOR
+                let cumpleAsesor = true;
+                if (filtroAsesor === "sin_asignar") {
+                    cumpleAsesor = seguimiento.trim() === "" || seguimiento.toLowerCase().includes("oficina");
+                } else if (filtroAsesor !== "todos") {
+                    cumpleAsesor = seguimiento === filtroAsesor;
+                }
+                
+                return cumpleTexto && cumpleHumano && cumpleNoLeido && cumpleAsesor;
             });
 
             if(clientesFiltrados.length === 0) {
@@ -293,6 +342,11 @@
                     const fontWeight = isUnread ? 'font-extrabold text-gray-900' : (isActive ? 'font-bold text-c21-gold' : 'font-bold text-gray-800');
                     const dotIndicator = isUnread ? `<span class="inline-block w-2 h-2 bg-green-500 rounded-full ml-2 shadow-sm animate-pulse"></span>` : '';
 
+                    // NUEVO: LA ETIQUETA DORADA DEL ASESOR ASIGNADO
+                    const badgeAsesor = c.seguimiento && c.seguimiento.trim() !== "" && !c.seguimiento.toLowerCase().includes("oficina") 
+                        ? `<p class="text-[10px] text-[#A88850] font-bold mt-1.5 uppercase tracking-wide"><i class="fa-solid fa-headset mr-1"></i>${c.seguimiento}</p>` 
+                        : '';
+
                     div.innerHTML = `
                         <div class="flex-1 min-w-0 pr-4">
                             <div class="flex items-center">
@@ -301,8 +355,9 @@
                             </div>
                             <p class="text-xs text-gray-500 mb-1">${safeTelefono}</p>
                             <p class="text-xs ${isUnread ? 'text-gray-800 font-semibold' : 'text-gray-400'} truncate italic">${safeMensaje}</p>
+                            ${badgeAsesor}
                         </div>
-                        <div class="flex-shrink-0">
+                        <div class="flex-shrink-0 flex flex-col items-end space-y-1">
                             ${isBotOn 
                                 ? '<span class="bg-c21-black text-c21-gold text-[9px] px-2 py-1 rounded font-bold tracking-wide shadow-sm"><i class="fa-solid fa-robot"></i> IA</span>' 
                                 : '<span class="bg-c21-gold text-white text-[9px] px-2 py-1 rounded font-bold tracking-wide shadow-sm"><i class="fa-solid fa-user"></i> HUMANO</span>'}
@@ -468,9 +523,6 @@
             }
         }
 
-        // ==============================================================================
-        // LÓGICA CRUD DE ASESORES
-        // ==============================================================================
         function abrirModalAsesores() {
             document.getElementById('modal-asesores').classList.remove('hidden');
             cargarAsesoresModal();
@@ -547,12 +599,12 @@
                 if (data.status === "ok") {
                     document.getElementById('nuevo-asesor-nombre').value = '';
                     document.getElementById('nuevo-asesor-telefono').value = '';
-                    cargarAsesoresModal(); // Recargamos la lista
+                    cargarAsesoresModal(); 
                 } else {
-                    alert("Error al guardar el asesor en la base de datos.");
+                    alert("El servidor rechazó la acción. Detalles del error:\n\n" + data.detalle);
                 }
             } catch (error) {
-                alert("Hubo un error de conexión.");
+                alert("Hubo un error de conexión. Verifica que el servidor (FastAPI) esté encendido.");
             }
         }
 
@@ -564,7 +616,7 @@
                 const res = await fetch(`/api/asesores/${id}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (data.status === "ok") {
-                    cargarAsesoresModal(); // Recargamos la lista tras borrar
+                    cargarAsesoresModal(); 
                 } else {
                     alert("No se pudo eliminar al asesor.");
                 }
@@ -585,9 +637,6 @@
             } catch (error) {}
         }
 
-        // ==============================================================================
-        // LÓGICA DE REPORTES
-        // ==============================================================================
         async function abrirModalReportes() {
             document.getElementById('modal-reportes').classList.remove('hidden');
             document.getElementById('lista-propiedades-reporte').innerHTML = '';
