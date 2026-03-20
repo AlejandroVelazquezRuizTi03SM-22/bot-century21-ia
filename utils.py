@@ -20,11 +20,15 @@ def limpiar_numero(valor):
     return int(limpio) if limpio else 0
 
 def detectar_intencion_ver_propiedades(texto: str) -> bool:
+    # Agregamos términos de campañas, zonas y formas coloquiales de pedir informes
     claves = [
         "ver", "mostrar", "qué tienes", "que tienes", "opciones", 
         "inventario", "catálogo", "catalogo", "info", "información", 
-        "precio", "fotos", "enviar", "mandame", "interesa una casa", 
-        "busco casa", "quiero comprar", "busco terreno", "rentar", "comprar"
+        "precio", "fotos", "enviar", "mandame", "interesa", 
+        "busco", "quiero", "rentar", "comprar", "venta",
+        "tienes casas", "tienen depas", "propiedad", "inmueble",
+        "fraccionamiento", "colonia", "zona", "ubicación", "ubicacion",
+        "anuncio", "publicación", "publicacion", "club de golf", "campestre", "san gil"
     ]
     texto_lower = texto.lower()
     return any(c in texto_lower for c in claves)

@@ -1,42 +1,58 @@
-from twilio.rest import Client
 import config
+from twilio.rest import Client
 
-# ---------------------------------------------------------
-# CONFIGURACIÓN DE TWILIO (Tus credenciales de la consola)
-# ---------------------------------------------------------
-# CORRECTO: Usamos el punto (.) para llamar a la variable que vive dentro de config.py
-TWILIO_ACCOUNT_SID = config.TWILIO_ACCOUNT_SID
-TWILIO_AUTH_TOKEN = config.TWILIO_AUTH_TOKEN
-TWILIO_NUMERO_BOT = "whatsapp:+14155238886" # El número de tu Sandbox o el Oficial
+# =========================================================
+# CONFIGURACIÓN DE TWILIO
+# =========================================================
+# Inicializamos el cliente de Twilio una sola vez
+client = Client(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN)
 
-# Inicializamos el cliente de Twilio
-twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+# Tus números oficiales
+NUMERO_TWILIO = "whatsapp:+5214271097523" 
+NUMERO_OFICINA = "whatsapp:+5214276880588" 
 
-def enviar_alerta_asesor(numero_asesor, datos_cliente, resumen_ejecutivo):
-    # Limpiamos el número para generar el enlace clicable de wa.me
-    telefono_limpio = datos_cliente['telefono'].replace('whatsapp:+', '')
-    
-    mensaje_texto = f"""🚨 *¡NUEVO LEAD DE CENTURY 21 Diamante!* 🚨
+def enviar_alerta_asesor(numero_asesor, datos_cliente, resumen_ai, nombre_asesor):
+    # 1. Extraemos los datos del cliente
+    cliente_nombre = datos_cliente.get('nombre', 'Cliente sin nombre')
+    cliente_telefono = datos_cliente.get('telefono', 'Sin teléfono')
+    zona = datos_cliente.get('zona', 'No especificada')
+    presupuesto = datos_cliente.get('presupuesto', 'No especificado')
+    zona_presupuesto = f"{zona} / {presupuesto}"
 
-👤 *Cliente:* {datos_cliente['nombre']}
-📞 *Teléfono:* {datos_cliente['telefono']}
+    # 2. CONSTRUIMOS LA PLANTILLA EXACTA (Aprobada por Meta)
+    mensaje_plantilla = f"""🚨 *NUEVO LEAD CENTURY 21 DIAMANTE* 🚨
 
-📋 *Resumen de la IA:*
-{resumen_ejecutivo}
+Hola {nombre_asesor}, el asistente virtual te ha asignado un nuevo prospecto.
 
-📲 *Contactar ahora:* Haz clic aquí para enviarle un mensaje rápido al cliente: https://wa.me/{telefono_limpio}
+👤 *Cliente:* {cliente_nombre}
+📱 *Teléfono:* {cliente_telefono}
+📍 *Zona/Presupuesto:* {zona_presupuesto}
 
-¡Éxito en tu cierre! 🤝"""
+📝 *Resumen de la solicitud:*
+{resumen_ai}
+
+Por favor, contacta a este prospecto lo antes posible. ¡Mucho éxito! 💎"""
 
     try:
-        # Ejecutamos el envío del mensaje
-        message = twilio_client.messages.create(
-            from_=TWILIO_NUMERO_BOT,
-            body=mensaje_texto,
-            to=numero_asesor
+        # 3. Enviar mensaje al Asesor
+        if numero_asesor:
+            # 🛡️ BLINDAJE: Limpiamos el número para evitar errores de mayúsculas ("WhatsApp:") o espacios
+            numero_limpio = numero_asesor.lower().replace("whatsapp:", "").strip()
+            numero_formateado = f"whatsapp:{numero_limpio}"
+            
+            client.messages.create(
+                from_=NUMERO_TWILIO,
+                body=mensaje_plantilla,
+                to=numero_formateado
+            )
+            print(f"[ALERTA ENVIADA] Lead enviado a {nombre_asesor} con plantilla oficial.")
+        
+        # 4. Enviar copia a la Oficina
+        client.messages.create(
+            from_=NUMERO_TWILIO,
+            body=mensaje_plantilla,
+            to=NUMERO_OFICINA
         )
-        print(f"[WHATSAPP NOTIFIER] Alerta enviada correctamente al asesor. SID: {message.sid}")
-        return True
+        
     except Exception as e:
-        print(f"[ERROR WHATSAPP NOTIFIER] No se pudo enviar la alerta: {e}")
-        return False
+        print(f"[ERROR TWILIO PLANTILLA] {e}")
